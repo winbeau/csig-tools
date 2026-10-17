@@ -30,7 +30,10 @@ while [ "$d" != / ]; do
 done
 [ -n "$ROOT" ] || die "no package found above $TOOLS (expected PILOT_final/$VENV)"
 PKG=$ROOT/PILOT_final
-PY=PILOT_final/$VENV          # used relative to $ROOT
+# Everything below is expressed relative to $ROOT and launched after a cd
+# there, so `ps` and nvtop show a short command instead of a wall of path.
+PY=PILOT_final/$VENV
+HERE=${TOOLS#"$ROOT"/}
 
 uuid_of() { nvidia-smi --query-gpu=uuid --format=csv,noheader -i "$1" | tr -d ' '; }
 held_cards() { tmux list-windows -t "$SESSION" -F '#{window_name}' 2>/dev/null | sed -n 's/^gpu//p'; }
@@ -78,9 +81,9 @@ cmd_start() {
     if tmux list-windows -t "$SESSION" -F '#{window_name}' | grep -qx "gpu$i"; then
       echo "card $i: already reserved"; continue
     fi
-    # cd into the package root and launch through the relative venv path
+    # cd into the package root, then everything is a short relative path
     tmux new-window -d -t "$SESSION" -n "gpu$i" \
-      "cd '$ROOT' && exec $PY '$TOOLS/$WORKER' --index $i --gib $GIB --max-hours $HOURS 2>&1 | tee -a '$TOOLS/reserve.gpu$i.log'"
+      "cd '$ROOT' && $PY $HERE/$WORKER --index $i --gib $GIB --max-hours $HOURS 2>&1 | tee -a $HERE/reserve.gpu$i.log"
     echo "card $i: reserved"
   done
   sleep 8; cmd_status
